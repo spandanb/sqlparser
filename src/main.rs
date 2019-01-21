@@ -72,6 +72,22 @@ struct CreateTable {
     column_defs: Vec<ColumnDef>,
 }
 
+#[derive(Debug)]
+struct SelectStmnt {
+    table_name: String,
+    columns: String,
+}
+
+#[derive(Debug)]
+enum ParsedStmnt {
+    // The CreateTable operation and the corresponding
+    // create table data
+    CreateTable(CreateTable),
+    SelectStmnt(SelectStmnt)
+}
+
+
+
 fn parse_sql(stmnt: &str) -> CreateTable {
 
     let mut create_table = CreateTable{
@@ -81,13 +97,16 @@ fn parse_sql(stmnt: &str) -> CreateTable {
 
     let mut column_name : Option<&str> = None;
 
-    let create_table_stmnt = SQLParser::parse(Rule::create_table_stmnt, stmnt)
+    let create_table_stmnt = SQLParser::parse(Rule::sql_grammar, stmnt)
     .expect("successful parse") // unwrap the parse result
     .next().unwrap(); // get and unwrap the `file` rule; never fails
 
     for create_table_child in create_table_stmnt.into_inner()
     .flatten() {
         match create_table_child.as_rule() {
+            Rule::create_kw => {
+
+            }
             Rule::table_name => {
                 let table_name = create_table_child.as_str();
                 create_table.table_name = String::from(table_name)
@@ -113,5 +132,7 @@ fn parse_sql(stmnt: &str) -> CreateTable {
 
 
 fn main() {
-    parse_sql("CREATE TABLE foo { bar INT , baz TEXT  }");
+    //let stmnt = "CREATE TABLE foo { bar INT , baz TEXT  }"
+    let stmnt = "SELECT * FROM foo";
+    parse_sql(stmnt);
 }

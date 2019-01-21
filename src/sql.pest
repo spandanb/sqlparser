@@ -3,6 +3,7 @@
 open_brace = { "{" }
 close_brace = { "}" }
 comma = { "," }
+star = { "*" }
 
 //////// SPECIAL
 WHITESPACE = _{ " " }
@@ -16,6 +17,10 @@ text = { "TEXT" }
 // case insensitivity is specified through '^'
 create_kw = { ^"CREATE" }
 table_kw = { ^"TABLE" }
+
+select_kw = { ^"SELECT" }
+from_kw = {  ^"FROM" }
+
 table_name = { (ASCII_ALPHA)+ }
 
 ///////// CREATE TABLE DEFINITION
@@ -26,7 +31,13 @@ column_def = { column_name ~ column_type }
 
 table_fields = { (column_def ~ comma)* ~ (column_def)? }
 
-create_table_stmnt = { SOI ~
-                       create_kw ~ table_kw ~ table_name ~
-                       (open_brace ~ table_fields ~ close_brace) ~
-                       EOI }
+create_table_stmnt = { create_kw ~ table_kw ~ table_name ~
+                       (open_brace ~ table_fields ~ close_brace) }
+
+////////// SELECT STATEMENT
+
+select_stmnt = { select_kw ~ star ~ from_kw ~ table_name }
+
+////////// UNIFIED EXPRESSION
+
+sql_grammar = {SOI ~ (create_table_stmnt | select_stmnt ) ~ EOI }
