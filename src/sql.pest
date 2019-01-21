@@ -1,0 +1,31 @@
+// not sure why the default WHITESPACE wasn't being used
+// but without this parser wasn't working
+WHITESPACE = _{ " " }
+
+// keywords will be case insensitive
+// case insensitivity is specified through '^'
+create_kw = { ^"CREATE" }
+table_kw = { ^"TABLE" }
+table_name = { (ASCII_ALPHA)+ }
+
+// curly braces
+open_brace = { "{" }
+close_brace = { "}" }
+
+comma = { "," }
+// without @ this was failing
+// probably it was globbing the whole inner body
+// since without it, the whitespace was being matched
+column_name = @{ (ASCII_ALPHA)+ }
+
+int = { "INT" }
+text = { "TEXT" }
+column_type = @{ ( int | text ) }
+column_def = { column_name ~ column_type }
+
+table_fields = { (column_def ~ comma)* ~ (column_def)? }
+
+create_table_stmnt = { SOI ~
+                       create_kw ~ table_kw ~ table_name ~
+                       (open_brace ~ table_fields ~ close_brace) ~
+                       EOI }
