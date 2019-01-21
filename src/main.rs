@@ -105,15 +105,6 @@ enum ParsedStmnt {
     SelectStmnt(SelectStmnt),
 }
 
-#[derive(Debug)]
-enum ParsedStmntOption {
-    // The CreateTable operation and the corresponding
-    // create table data
-    CreateTableOption(CreateTableOption),
-    SelectStmntOption(SelectStmntOption),
-    None
-}
-
 fn unwrap_column_defs(column_defs: & mut Vec<Option<ColumnDefOption>>) -> Vec<ColumnDef> {
     // recursive function avoid borrow checker and looped
     // value mutations
@@ -147,7 +138,7 @@ fn parse_create_table_stmnt(pairs: pest::iterators::FlatPairs<'_, Rule>) -> Crea
                 ct_opt.table_name = Some(String::from(table_name))
             },
             Rule::column_name => {
-                column_name = Some(child.to_string());
+                column_name = Some(String::from(child.as_str()));
             },
             Rule::column_type => {
                 // ordering ensures column_name is set
@@ -221,7 +212,6 @@ fn parse_sql(stmnt: &str) -> ParsedStmnt {
             _ => (),
         }
     }
-
     println!("Created: {:?}", result);
     result.unwrap()
 }
