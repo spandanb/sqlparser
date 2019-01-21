@@ -1,25 +1,26 @@
-// not sure why the default WHITESPACE wasn't being used
-// but without this parser wasn't working
+//////// PUNCTUATIONS
+// curly braces
+open_brace = { "{" }
+close_brace = { "}" }
+comma = { "," }
+
+//////// SPECIAL
 WHITESPACE = _{ " " }
 
+///////// DATATYPE
+int = { "INT" }
+text = { "TEXT" }
+
+///////// SQL KEYWORDS/IDENTIFIERS
 // keywords will be case insensitive
 // case insensitivity is specified through '^'
 create_kw = { ^"CREATE" }
 table_kw = { ^"TABLE" }
 table_name = { (ASCII_ALPHA)+ }
 
-// curly braces
-open_brace = { "{" }
-close_brace = { "}" }
-
-comma = { "," }
-// without @ this was failing
-// probably it was globbing the whole inner body
-// since without it, the whitespace was being matched
+///////// CREATE TABLE DEFINITION
 column_name = @{ (ASCII_ALPHA)+ }
 
-int = { "INT" }
-text = { "TEXT" }
 column_type = @{ ( int | text ) }
 column_def = { column_name ~ column_type }
 
