@@ -18,14 +18,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_sql_1() {
+    fn test_parse_create_table() {
         let stmnt = "CREATE TABLE foo { bar INT , baz TEXT  }";
-        let res = parse_sql(stmnt);
-        assert_eq!(res.table_name, "foo");
-        assert_eq!(res.column_defs[0].column_name, "bar");
-        assert_eq!(res.column_defs[0].column_type, SqlType::Int);
-        assert_eq!(res.column_defs[1].column_name, "baz");
-        assert_eq!(res.column_defs[1].column_type, SqlType::Text);
+        if let ParsedStmnt::CreateTable(res) = parse_sql(stmnt) {
+            assert_eq!(res.table_name, "foo");
+            assert_eq!(res.column_defs[0].column_name, "bar");
+            assert_eq!(res.column_defs[0].column_type, SqlType::Int);
+            assert_eq!(res.column_defs[1].column_name, "baz");
+            assert_eq!(res.column_defs[1].column_type, SqlType::Text);
+        }
+    }
+
+    #[test]
+    fn test_parse_select_stmnt() {
+        let stmnt = "SELECT * FROM foo";
+        if let ParsedStmnt::SelectStmnt(res) = parse_sql(stmnt) {
+            assert_eq!(res.table_name, "foo");
+            assert_eq!(res.select_columns, "*");
+        }
+    }
+
+    #[test]
+    fn test_parse_insert_stmnt() {
+        let stmnt = "INSERT INTO foo (cola, colb, colc) VALUES (v1, v2, v3)";
+        if let ParsedStmnt::InsertStmnt(res) = parse_sql(stmnt) {
+            assert_eq!(res.table_name, "foo");
+            assert_eq!(res.columns[0], "cola");
+            assert_eq!(res.columns[1], "colb");
+            assert_eq!(res.columns[2], "colc");
+            assert_eq!(res.values[0], "v1");
+            assert_eq!(res.values[1], "v2");
+            assert_eq!(res.values[2], "v3");
+        }
     }
 }
 
@@ -98,16 +122,34 @@ struct SelectStmntOption {
 }
 
 #[derive(Debug)]
+struct InsertStmnt {
+    table_name: String,
+    columns: Vec<String>,
+    // conversion to correct type requires info
+    // which is not available from the insert stmnt
+    values: Vec<String>
+}
+
+#[derive(Debug)]
+struct InsertStmntOption {
+    table_name: Option<String>,
+    columns: Vec<Option<String>>,
+    values: Vec<Option<String>>
+}
+
+#[derive(Debug)]
 enum ParsedStmnt {
-    // The CreateTable operation and the corresponding
-    // create table data
+    // the operation and the corresponding data
     CreateTable(CreateTable),
     SelectStmnt(SelectStmnt),
+    InsertStmnt(InsertStmnt),
 }
 
 fn unwrap_column_defs(column_defs: & mut Vec<Option<ColumnDefOption>>) -> Vec<ColumnDef> {
-    // recursive function avoid borrow checker and looped
-    // value mutations
+    // recursive function to avoid borrow checker
+    // this is hard to use generically since it does a deep unwrap
+    // a better approach might be to implement (non-)optional variant
+    // via a trait
     if column_defs.len() == 0 {
         return Vec::<ColumnDef>::new();
     }
@@ -123,7 +165,19 @@ fn unwrap_column_defs(column_defs: & mut Vec<Option<ColumnDefOption>>) -> Vec<Co
     result
 }
 
+fn unwrap_vec<T>(vec: & mut Vec<Option<T>>) -> Vec<T> {
+    // unwrap a  vector of options
+    if vec.len() == 0 {
+        return Vec::<T>::new();
+    }
+    let ele = vec.pop();
+    let mut result = unwrap_vec(vec);
+    result.push(ele.unwrap().unwrap());
+    result
+}
+
 fn parse_create_table_stmnt(pairs: pest::iterators::FlatPairs<'_, Rule>) -> CreateTable {
+    // parse create table stmnt
     //splitting the parser up so, so I can practice macros latter
     let mut ct_opt = CreateTableOption {
             table_name: None,
@@ -161,6 +215,37 @@ fn parse_create_table_stmnt(pairs: pest::iterators::FlatPairs<'_, Rule>) -> Crea
     }
 }
 
+fn parse_insert_stmnt(pairs: pest::iterators::FlatPairs<'_, Rule>) -> InsertStmnt {
+    let mut is_opt = InsertStmntOption {
+            table_name: None,
+            columns: Vec::new(),
+            values: Vec::new()
+    };
+
+    for child in pairs {
+        match child.as_rule() {
+            Rule::table_name => {
+                let table_name = child.as_str();
+                is_opt.table_name = Some(String::from(table_name))
+            },
+            Rule::column_name => {
+                let column_name = Some(String::from(child.as_str()));
+                is_opt.columns.push(column_name);
+            },
+            Rule::value => {
+                let column_value = Some(String::from(child.as_str()));
+                is_opt.values.push(column_value);
+            },
+            _ => (),
+        }
+    }
+    InsertStmnt {
+        table_name: is_opt.table_name.unwrap(),
+        columns: unwrap_vec(&mut is_opt.columns),
+        values: unwrap_vec(&mut is_opt.values),
+    }
+}
+
 fn parse_select_stmnt(pairs: pest::iterators::FlatPairs<'_, Rule>) -> SelectStmnt {
     let mut st_opt = SelectStmntOption {
             table_name: None,
@@ -177,8 +262,6 @@ fn parse_select_stmnt(pairs: pest::iterators::FlatPairs<'_, Rule>) -> SelectStmn
             _ => (),
         }
     }
-    // println!("SelectStmnt is {:?}", st_opt);
-    // materialize the option
     SelectStmnt {
         table_name: st_opt.table_name
                         .unwrap(),
@@ -188,9 +271,14 @@ fn parse_select_stmnt(pairs: pest::iterators::FlatPairs<'_, Rule>) -> SelectStmn
 }
 
 fn parse_sql(stmnt: &str) -> ParsedStmnt {
+    // parses sql statement
+    // collecting the parsed the results is done
+    // in parse_<STMNT> functions
+
     let parsed_stmnt = SQLParser::parse(Rule::sql_grammar, stmnt)
-    .expect("successful parse") // unwrap the parse result
-    .next().unwrap(); // get and unwrap the `file` rule; never fails
+    .expect("grammar parse failed") // unwrap the parse result
+    .next()
+    .unwrap(); // get and unwrap the `sql_grammar` rule;
 
     let mut result : Option<ParsedStmnt> = None;
 
@@ -200,25 +288,28 @@ fn parse_sql(stmnt: &str) -> ParsedStmnt {
                 .flatten() {
         match child.as_rule() {
             Rule::create_kw => {
-                // println!("IN create_table");
                 let create_table = parse_create_table_stmnt(pairs.clone().flatten());
                 result = Some(ParsedStmnt::CreateTable(create_table))
-            }
+            },
             Rule::select_kw => {
-                // println!("IN select_kw");
                 let select_stmnt = parse_select_stmnt(pairs.clone().flatten());
                 result = Some(ParsedStmnt::SelectStmnt(select_stmnt))
-            }
+            },
+            Rule::insert_kw => {
+                let insert_stmnt = parse_insert_stmnt(pairs.clone().flatten());
+                result = Some(ParsedStmnt::InsertStmnt(insert_stmnt))
+            },
             _ => (),
         }
     }
-    println!("Created: {:?}", result);
     result.unwrap()
 }
 
 
 fn main() {
-    let stmnt = "CREATE TABLE foo { bar INT , baz TEXT  }";
-    //let stmnt = "SELECT * FROM foo";
-    parse_sql(stmnt);
+    // let stmnt = "CREATE TABLE foo { bar INT , baz TEXT  }";
+    // let stmnt = "SELECT * FROM foo";
+    let stmnt = "INSERT INTO foo (bar, baz) VALUES ( abcd, def )";
+    let result = parse_sql(stmnt);
+    println!("Parsed: {:?}", result);
 }
