@@ -36,8 +36,14 @@ create_table_stmnt = { create_kw ~ table_kw ~ table_name ~
 
 ////////// SELECT STATEMENT
 
+
 select_stmnt = { select_kw ~ star ~ from_kw ~ table_name }
 
 ////////// UNIFIED EXPRESSION
 
-sql_grammar = {SOI ~ (create_table_stmnt | select_stmnt ) ~ EOI }
+select_stub = { select_kw ~ star ~ from_kw ~ table_name }
+
+create_table_stub = { create_kw ~ table_kw ~ table_name ~
+                       (open_brace ~ table_fields ~ close_brace) }
+
+sql_grammar = {SOI ~ (create_table_stub | select_stub ) ~ EOI }
