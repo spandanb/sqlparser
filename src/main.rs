@@ -73,63 +73,45 @@ struct CreateTable {
 }
 
 fn parse_sql(stmnt: &str) -> CreateTable {
-    // use the following pairs of statements for determining whether it parsed correctly
-    //let stmnt = "CREATE TABLE foo { bar INT , baz TEXT  }";
-//    println!("Stmnt is: {:?}", stmnt);
-//    let parsed = SQLParser::parse(Rule::create_table_stmnt, &stmnt);
-//    println!("{:?}", parsed);
-
 
     let mut create_table = CreateTable{
         table_name: String::from(""),
         column_defs: Vec::new()
     };
 
-    let mut column_name = String::from("");
+    let mut column_name : Option<&str> = None;
 
     let create_table_stmnt = SQLParser::parse(Rule::create_table_stmnt, stmnt)
-    //println!("{:?}", create_table_stmnt);
     .expect("successful parse") // unwrap the parse result
     .next().unwrap(); // get and unwrap the `file` rule; never fails
 
-    for create_table_child in create_table_stmnt.into_inner() {
+    for create_table_child in create_table_stmnt.into_inner()
+    .flatten() {
         match create_table_child.as_rule() {
             Rule::table_name => {
                 let table_name = create_table_child.as_str();
                 create_table.table_name = String::from(table_name)
             },
-            Rule::table_fields => {
-                for column_def in create_table_child.into_inner() {
-                    match column_def.as_rule() {
-                        Rule::column_def => {
-                            for column_param in column_def.into_inner() {
-                                match column_param.as_rule() {
-                                    Rule::column_name => {
-                                        column_name = String::from(column_param.as_str());
-                                    },
-                                    Rule::column_type => {
-                                        let column_def = ColumnDef {
-                                            column_name: column_name.clone(),
-                                            column_type: SqlType::from_str(column_param.as_str())
-                                                            .expect("successfully parsed sql-type"),
-                                        };
-                                        create_table.column_defs.push(column_def);
-                                    },
-                                    _ => (),
-                                }
-                            }
-                        },
-                        _ => (),
-                    }
-                }
+            Rule::column_name => {
+                column_name = Some(create_table_child.as_str());
             },
-            _ => (), // ignore the rest
+            Rule::column_type => {
+                // ordering ensures column_name is set
+                let column_def = ColumnDef {
+                    column_name: String::from(column_name.unwrap()),
+                    column_type: SqlType::from_str(create_table_child.as_str())
+                                    .expect("successfully parsed sql-type"),
+                };
+                create_table.column_defs.push(column_def);
+            }
+            _ => (),
         }
     }
     println!("Created: {:?}", create_table);
     create_table
 }
 
+
 fn main() {
-    parse_sql("create TABLE bar { foo INT , }");
+    parse_sql("CREATE TABLE foo { bar INT , baz TEXT  }");
 }
