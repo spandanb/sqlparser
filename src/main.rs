@@ -73,9 +73,21 @@ struct CreateTable {
 }
 
 #[derive(Debug)]
+struct  CreateTableOption {
+    table_name: Option<String>,
+    column_defs: Vec<Option<ColumnDef>>
+}
+
+#[derive(Debug)]
 struct SelectStmnt {
     table_name: String,
     columns: String,
+}
+
+#[derive(Debug)]
+struct SelectStmntOption {
+    table_name: Option(String),
+    columns: Option(String),
 }
 
 #[derive(Debug)]
@@ -83,45 +95,93 @@ enum ParsedStmnt {
     // The CreateTable operation and the corresponding
     // create table data
     CreateTable(CreateTable),
-    SelectStmnt(SelectStmnt)
+    SelectStmnt(SelectStmnt),
 }
 
+#[derive(Debug)]
+enum ParsedStmntOption {
+    // The CreateTable operation and the corresponding
+    // create table data
+    CreateTableOption(CreateTableOption),
+    SelectStmntOption(SelectStmntOption),
+    None
+}
+
+fn mk_parse_stmnt(&str: first_kw) -> ParsedStmntOption {
+    // determine stmnt type from first keyword
+    let first_kw = first_kw.to_lowercase();
+    if first_kw == "create" {
+        return
+        ParsedStmntOption::CreateTableOption(
+        )
+    } else if == "select" {
+        return
+        ParsedStmntOption::SelectStmntOption(
+            SelectStmntOption {
+                table_name: None,
+                column_name: None
+            }
+        )
+    } else {
+        unreachable!();
+    }
+}
+
+fn parse_stmnt(& mut ps_opt: ParsedStmntOption) -> ParsedStmntOption {
+    match ps_opt
+}
 
 
 fn parse_sql(stmnt: &str) -> CreateTable {
 
-    let mut create_table = CreateTable{
+    let create_table_stmnt = SQLParser::parse(Rule::sql_grammar, stmnt)
+    .expect("successful parse") // unwrap the parse result
+    .next().unwrap(); // get and unwrap the `file` rule; never fails
+
+
+
+    let mut create_table = CreateTable {
         table_name: String::from(""),
         column_defs: Vec::new()
     };
 
     let mut column_name : Option<&str> = None;
 
-    let create_table_stmnt = SQLParser::parse(Rule::sql_grammar, stmnt)
-    .expect("successful parse") // unwrap the parse result
-    .next().unwrap(); // get and unwrap the `file` rule; never fails
+    let ps_opt = ParsedStmntOption::None;
 
     for create_table_child in create_table_stmnt.into_inner()
     .flatten() {
         match create_table_child.as_rule() {
             Rule::create_kw => {
-
+                ps_opt = ParsedStmntOption::CreateTableOption {
+                    table_name: None,
+                    column_defs: Vec::new()
+                }
+            }
+            Rule::select_kw => {
+                ps_opt = ParsedStmntOption::SelectStmntOption(
+                    SelectStmntOption {
+                        table_name: None,
+                        column_name: None
+                    }
             }
             Rule::table_name => {
                 let table_name = create_table_child.as_str();
-                create_table.table_name = String::from(table_name)
+                ps_opt.table_name = String::from(table_name)
             },
             Rule::column_name => {
                 column_name = Some(create_table_child.as_str());
             },
             Rule::column_type => {
+                // currently this relies on this being unique
+                // in the future might require matching
                 // ordering ensures column_name is set
                 let column_def = ColumnDef {
                     column_name: String::from(column_name.unwrap()),
                     column_type: SqlType::from_str(create_table_child.as_str())
                                     .expect("successfully parsed sql-type"),
                 };
-                create_table.column_defs.push(column_def);
+                ps_opt.column_defs.push(column_def);
             }
             _ => (),
         }
