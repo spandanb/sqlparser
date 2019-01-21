@@ -67,6 +67,13 @@ struct ColumnDef {
 }
 
 #[derive(Debug)]
+struct ColumnDefOptional {
+    column_name: Option<String>,
+    column_type: Option<SqlType>
+}
+
+
+#[derive(Debug)]
 struct CreateTable {
     table_name: String,
     column_defs: Vec<ColumnDef>,
@@ -75,19 +82,19 @@ struct CreateTable {
 #[derive(Debug)]
 struct  CreateTableOption {
     table_name: Option<String>,
-    column_defs: Vec<Option<ColumnDef>>
+    column_defs: Vec<Option<ColumnDef>>,
 }
 
 #[derive(Debug)]
 struct SelectStmnt {
     table_name: String,
-    columns: String,
+    select_columns: String,
 }
 
 #[derive(Debug)]
 struct SelectStmntOption {
-    table_name: Option(String),
-    columns: Option(String),
+    table_name: Option<String>,
+    select_columns: Option<String>,
 }
 
 #[derive(Debug)]
@@ -107,87 +114,70 @@ enum ParsedStmntOption {
     None
 }
 
-fn mk_parse_stmnt(&str: first_kw) -> ParsedStmntOption {
-    // determine stmnt type from first keyword
-    let first_kw = first_kw.to_lowercase();
-    if first_kw == "create" {
-        return
-        ParsedStmntOption::CreateTableOption(
-        )
-    } else if == "select" {
-        return
-        ParsedStmntOption::SelectStmntOption(
-            SelectStmntOption {
-                table_name: None,
-                column_name: None
-            }
-        )
-    } else {
-        unreachable!();
-    }
-}
+fn parse_sql(stmnt: &str) -> ParsedStmnt {
 
-fn parse_stmnt(& mut ps_opt: ParsedStmntOption) -> ParsedStmntOption {
-    match ps_opt
-}
-
-
-fn parse_sql(stmnt: &str) -> CreateTable {
-
-    let create_table_stmnt = SQLParser::parse(Rule::sql_grammar, stmnt)
+    let parsed_stmnt = SQLParser::parse(Rule::sql_grammar, stmnt)
     .expect("successful parse") // unwrap the parse result
     .next().unwrap(); // get and unwrap the `file` rule; never fails
 
-
-
-    let mut create_table = CreateTable {
-        table_name: String::from(""),
-        column_defs: Vec::new()
-    };
-
-    let mut column_name : Option<&str> = None;
-
     let ps_opt = ParsedStmntOption::None;
+    let ct_opt = CreateTableOption {    
+    }
+    let st_opt = SelectOption::None;
 
-    for create_table_child in create_table_stmnt.into_inner()
+    for child in parse_stmnt.into_inner()
     .flatten() {
-        match create_table_child.as_rule() {
+        match child.as_rule() {
             Rule::create_kw => {
-                ps_opt = ParsedStmntOption::CreateTableOption {
-                    table_name: None,
-                    column_defs: Vec::new()
-                }
+                ps_opt = ParsedStmntOption::CreateTableOption(
+                    CreateTableOption {
+                        table_name: None,
+                        column_defs: Vec::new()
+                    }
+                )
             }
             Rule::select_kw => {
                 ps_opt = ParsedStmntOption::SelectStmntOption(
                     SelectStmntOption {
                         table_name: None,
-                        column_name: None
+                        select_columns: None
                     }
+                )
             }
             Rule::table_name => {
-                let table_name = create_table_child.as_str();
+                let table_name = child.as_str();
                 ps_opt.table_name = String::from(table_name)
             },
+            Rule::select_columns => {
+                ps_opt.select_columns = String::from(child.as_str());
+            },
             Rule::column_name => {
-                column_name = Some(create_table_child.as_str());
+                let column_name = Some(child.as_str());
+                match ps_opt {
+                    ParsedStmntOption::CreateTableOption => {
+                        let cdef_opt = ColumnDefOption {
+                            column_name: column_name,
+                            column_type: None,
+                        };
+                        ps_opt.column_defs.push(cdef_opt);
+                    },
+                    ParsedStmntOption::SelectStmntOption => {
+                        ps_opt.select_column = column_name
+                    },
+                    _ => (),
+                }
             },
             Rule::column_type => {
-                // currently this relies on this being unique
-                // in the future might require matching
                 // ordering ensures column_name is set
-                let column_def = ColumnDef {
-                    column_name: String::from(column_name.unwrap()),
-                    column_type: SqlType::from_str(create_table_child.as_str())
-                                    .expect("successfully parsed sql-type"),
-                };
-                ps_opt.column_defs.push(column_def);
+                let mut cdef_opt = ps_opt.column_defs.last();
+                cdef_opt.column_type = SqlType::from_str(child.as_str())
+                                      .expect("successfully parsed sql-type");
             }
             _ => (),
         }
-    }
-    println!("Created: {:?}", create_table);
-    create_table
+    },
+    println!("Created: {:?}", ps_opt);
+    ps_opt
 }
 
 
